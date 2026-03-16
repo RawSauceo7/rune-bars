@@ -27,7 +27,7 @@ public class RuneBarsOverlay extends Overlay
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        if (plugin.getCapturedInfoBoxes().isEmpty() && fadingOut.isEmpty()) return null;
+        if (plugin.getCapturedInfoBoxes().isEmpty() && (!plugin.isTestMode() || plugin.getTestInfoBoxes().isEmpty()) && fadingOut.isEmpty()) return null;
         graphics.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
 
         int x = 0, y = 0, maxWidth = 0, maxHeight = 0;
@@ -39,6 +39,19 @@ public class RuneBarsOverlay extends Overlay
             } else {
                 y += config.iconSize() + config.spacing() + config.fontSize();
                 maxHeight = y; maxWidth = Math.max(maxWidth, config.iconSize());
+            }
+        }
+
+        if (plugin.isTestMode()) {
+            for (InfoBox ib : plugin.getTestInfoBoxes()) {
+                renderInfoBox(graphics, ib, x, y, 1.0f);
+                if (config.orientation() == ComponentOrientation.HORIZONTAL) {
+                    x += config.iconSize() + config.spacing();
+                    maxWidth = x; maxHeight = Math.max(maxHeight, config.iconSize() + config.fontSize());
+                } else {
+                    y += config.iconSize() + config.spacing() + config.fontSize();
+                    maxHeight = y; maxWidth = Math.max(maxWidth, config.iconSize());
+                }
             }
         }
 

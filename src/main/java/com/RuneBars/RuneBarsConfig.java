@@ -5,9 +5,11 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.ui.overlay.components.ComponentOrientation;
 
-@ConfigGroup("runebars")
+@ConfigGroup(RuneBarsConfig.GROUP)
 public interface RuneBarsConfig extends Config
 {
+	String GROUP = "runebars";
+
 	enum SortOrder { ASCENDING, DESCENDING }
 	enum SortType { ALPHABETICAL, TIME_REMAINING }
 

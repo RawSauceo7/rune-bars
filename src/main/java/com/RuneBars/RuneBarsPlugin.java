@@ -1,6 +1,9 @@
 package com.RuneBars;
 
 import com.google.inject.Provides;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
@@ -8,6 +11,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -33,12 +37,14 @@ public class RuneBarsPlugin extends Plugin
 	@Inject private InfoBoxManager infoBoxManager;
 	@Inject private OverlayManager overlayManager;
 	@Inject private ConfigManager configManager;
-	@Inject private RuneBarsConfig config;
+	@Getter @Inject private RuneBarsConfig config;
 	@Inject private RuneBarsOverlay overlay;
 	@Inject private ClientToolbar clientToolbar;
 
 	@Getter private final List<InfoBox> capturedInfoBoxes = new ArrayList<>();
 	@Getter private final Set<String> discoveredInfoBoxes = new HashSet<>();
+	@Getter private final List<InfoBox> testInfoBoxes = new ArrayList<>();
+	@Getter private boolean testMode;
 	private RuneBarsPanel panel;
 	private NavigationButton navButton;
 
@@ -85,10 +91,39 @@ public class RuneBarsPlugin extends Plugin
 	}
 
 	private boolean shouldCapture(InfoBox ib) {
-		Boolean enabled = configManager.getConfiguration("runebars", "enabled_" + ib.getName(), Boolean.class);
+		Boolean enabled = configManager.getConfiguration(RuneBarsConfig.GROUP, "enabled_" + ib.getName(), Boolean.class);
 		if (enabled != null) return enabled;
 		return config.combatOnlyByDefault() && (COMBAT_PATTERN.matcher(ib.getName()).find() ||
 				(ib.getTooltip() != null && COMBAT_PATTERN.matcher(ib.getTooltip()).find()));
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (event.getGroup().equals(RuneBarsConfig.GROUP)) {
+			sortCapturedInfoBoxes();
+			if (panel != null) {
+				panel.refreshSettings();
+			}
+		}
+	}
+
+	public void toggleTestMode() {
+		testMode = !testMode;
+		if (testMode) {
+			testInfoBoxes.clear();
+			BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
+			testInfoBoxes.add(new Timer(1, ChronoUnit.MINUTES, icon, this) {
+				@Override public String getName() { return "Test Timer"; }
+			});
+			testInfoBoxes.add(new InfoBox(icon, this) {
+				@Override public String getName() { return "Test Box"; }
+				@Override public String getText() { return "Test"; }
+				@Override public Color getTextColor() { return Color.WHITE; }
+			});
+		} else {
+			testInfoBoxes.clear();
+		}
+		sortCapturedInfoBoxes();
 	}
 
 	private void sortCapturedInfoBoxes() {
@@ -97,6 +132,7 @@ public class RuneBarsPlugin extends Plugin
 				: (b1, b2) -> (b1 instanceof Timer && b2 instanceof Timer) ? ((Timer) b1).getEndTime().compareTo(((Timer) b2).getEndTime()) : b1.getName().compareTo(b2.getName());
 		if (config.sortOrder() == RuneBarsConfig.SortOrder.DESCENDING) comp = comp.reversed();
 		Collections.sort(capturedInfoBoxes, comp);
+		Collections.sort(testInfoBoxes, comp);
 	}
 
 	@Provides RuneBarsConfig provideConfig(ConfigManager cm) { return cm.getConfig(RuneBarsConfig.class); }
