@@ -160,15 +160,18 @@ public class RuneBarsPanel extends PluginPanel
 
     public void refreshSettings() {
         SwingUtilities.invokeLater(() -> {
-            orientation.setSelectedItem(plugin.getConfig().orientation());
-            iconSize.setValue(plugin.getConfig().iconSize());
-            spacing.setValue(plugin.getConfig().spacing());
-            sortType.setSelectedItem(plugin.getConfig().sortType());
-            sortOrder.setSelectedItem(plugin.getConfig().sortOrder());
-            flash.setValue(plugin.getConfig().flashThreshold());
-            fade.setValue(plugin.getConfig().fadeDelay());
-            combatOnly.setSelected(plugin.getConfig().combatOnlyByDefault());
-            fontSize.setValue(plugin.getConfig().fontSize());
+            RuneBarsConfig config = plugin.getConfig();
+            if (config == null) return;
+
+            orientation.setSelectedItem(config.orientation());
+            iconSize.setValue(config.iconSize());
+            spacing.setValue(config.spacing());
+            sortType.setSelectedItem(config.sortType());
+            sortOrder.setSelectedItem(config.sortOrder());
+            flash.setValue(config.flashThreshold());
+            fade.setValue(config.fadeDelay());
+            combatOnly.setSelected(config.combatOnlyByDefault());
+            fontSize.setValue(config.fontSize());
 
             for (Map.Entry<String, JCheckBox> entry : toggles.entrySet()) {
                 Boolean enabled = configManager.getConfiguration(RuneBarsConfig.GROUP, "enabled_" + entry.getKey(), Boolean.class);
