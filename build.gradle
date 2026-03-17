@@ -32,6 +32,7 @@ version = '1.0.0'
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 	options.release.set(11)
+	options.compilerArgs << "-Xlint:unchecked"
 }
 // This allows you to launch RuneLite with your plugin directly from Gradle
 tasks.register('run', JavaExec) {

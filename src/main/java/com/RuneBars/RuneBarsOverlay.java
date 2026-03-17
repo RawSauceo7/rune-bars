@@ -1,15 +1,25 @@
 package com.RuneBars;
 
-import java.awt.*;
+import java.awt.AlphaComposite;
+import java.awt.Color;
+import java.awt.Composite;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.time.*;
-import java.util.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.inject.Inject;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.ui.overlay.*;
+import net.runelite.client.ui.overlay.Overlay;
+import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.ComponentOrientation;
-import net.runelite.client.ui.overlay.infobox.*;
+import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.Timer;
 
 public class RuneBarsOverlay extends Overlay
@@ -40,11 +50,11 @@ public class RuneBarsOverlay extends Overlay
             renderInfoBox(graphics, ib, x, y, 1.0f);
             if (config.orientation() == ComponentOrientation.HORIZONTAL) {
                 x += config.iconSize() + config.spacing();
-                maxWidth = x; maxHeight = Math.max(maxHeight, config.iconSize() + config.fontSize());
             } else {
                 y += config.iconSize() + config.spacing() + config.fontSize();
-                maxHeight = y; maxWidth = Math.max(maxWidth, config.iconSize());
             }
+            maxWidth = Math.max(maxWidth, x + (config.orientation() == ComponentOrientation.HORIZONTAL ? 0 : config.iconSize()));
+            maxHeight = Math.max(maxHeight, y + (config.orientation() == ComponentOrientation.VERTICAL ? 0 : config.iconSize() + config.fontSize()));
         }
 
         if (plugin.isTestMode()) {
@@ -52,11 +62,11 @@ public class RuneBarsOverlay extends Overlay
                 renderInfoBox(graphics, ib, x, y, 1.0f);
                 if (config.orientation() == ComponentOrientation.HORIZONTAL) {
                     x += config.iconSize() + config.spacing();
-                    maxWidth = x; maxHeight = Math.max(maxHeight, config.iconSize() + config.fontSize());
                 } else {
                     y += config.iconSize() + config.spacing() + config.fontSize();
-                    maxHeight = y; maxWidth = Math.max(maxWidth, config.iconSize());
                 }
+                maxWidth = Math.max(maxWidth, x + (config.orientation() == ComponentOrientation.HORIZONTAL ? 0 : config.iconSize()));
+                maxHeight = Math.max(maxHeight, y + (config.orientation() == ComponentOrientation.VERTICAL ? 0 : config.iconSize() + config.fontSize()));
             }
         }
 
@@ -66,6 +76,13 @@ public class RuneBarsOverlay extends Overlay
             long elapsed = Duration.between(entry.getValue(), Instant.now()).toMillis();
             if (elapsed >= config.fadeDelay()) { it.remove(); continue; }
             renderInfoBox(graphics, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
+            if (config.orientation() == ComponentOrientation.HORIZONTAL) {
+                x += config.iconSize() + config.spacing();
+            } else {
+                y += config.iconSize() + config.spacing() + config.fontSize();
+            }
+            maxWidth = Math.max(maxWidth, x + (config.orientation() == ComponentOrientation.HORIZONTAL ? 0 : config.iconSize()));
+            maxHeight = Math.max(maxHeight, y + (config.orientation() == ComponentOrientation.VERTICAL ? 0 : config.iconSize() + config.fontSize()));
         }
 
         graphics.setFont(oldFont);
@@ -75,21 +92,28 @@ public class RuneBarsOverlay extends Overlay
 
     public void onInfoBoxRemoved(InfoBox ib) { if (config.fadeDelay() > 0) fadingOut.put(ib, Instant.now()); }
 
-    private void renderInfoBox(Graphics2D g, InfoBox ib, int x, int y, float opacity) {
+    private void renderInfoBox(Graphics2D graphics, InfoBox ib, int x, int y, float opacity) {
         BufferedImage img = ib.getImage();
         if (img == null) return;
-        float finalOpacity = opacity;
-        if (ib instanceof Timer && opacity >= 1.0f) {
-            long rem = Duration.between(Instant.now(), ((Timer) ib).getEndTime()).toSeconds();
-            if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) finalOpacity *= 0.5f;
+
+        Graphics2D g = (Graphics2D) graphics.create();
+        try {
+            float finalOpacity = opacity;
+            if (ib instanceof Timer && opacity >= 1.0f) {
+                long rem = Duration.between(Instant.now(), ((Timer) ib).getEndTime()).toSeconds();
+                if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) finalOpacity *= 0.5f;
+            }
+            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, finalOpacity));
+            g.setColor(getDominantColor(img));
+            g.fillRect(x, y, config.iconSize(), config.iconSize());
+            g.drawImage(img, x, y, config.iconSize(), config.iconSize(), null);
+            if (ib.getText() != null) {
+                g.setColor(ib.getTextColor());
+                g.drawString(ib.getText(), x, y + config.iconSize());
+            }
+        } finally {
+            g.dispose();
         }
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, finalOpacity));
-        Color color = getDominantColor(img);
-        g.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(100 * finalOpacity)));
-        g.fillRect(x, y, config.iconSize(), config.iconSize());
-        g.drawImage(img, x, y, config.iconSize(), config.iconSize(), null);
-        if (ib.getText() != null) { g.setColor(ib.getTextColor()); g.drawString(ib.getText(), x, y + config.iconSize()); }
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
     }
 
     private Color getDominantColor(BufferedImage img) {
@@ -105,7 +129,7 @@ public class RuneBarsOverlay extends Overlay
                     count++;
                 }
             }
-            return count == 0 ? Color.WHITE : new Color((int) (r / count), (int) (g / count), (int) (b / count));
+            return count == 0 ? new Color(255, 255, 255, 100) : new Color((int) (r / count), (int) (g / count), (int) (b / count), 100);
         });
     }
 }
