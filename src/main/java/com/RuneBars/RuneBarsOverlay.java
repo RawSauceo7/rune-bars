@@ -53,23 +53,41 @@ public class RuneBarsOverlay extends Overlay
             int iconSize = config.iconSize();
             int spacing = config.spacing();
             int fontSize = config.fontSize();
+            int totalMaxWidth = 0;
+            int totalMaxHeight = 0;
 
             for (InfoBox ib : captured) {
                 renderInfoBox(g, ib, x, y, 1.0f);
+                int itemWidth = iconSize;
+                if (ib.getText() != null) {
+                    itemWidth = Math.max(itemWidth, g.getFontMetrics().stringWidth(ib.getText()));
+                }
                 if (orientation == ComponentOrientation.HORIZONTAL) {
-                    x += iconSize + spacing;
+                    x += Math.max(iconSize, itemWidth) + spacing;
+                    totalMaxWidth = x;
+                    totalMaxHeight = Math.max(totalMaxHeight, iconSize + fontSize);
                 } else {
                     y += iconSize + spacing + fontSize;
+                    totalMaxHeight = y;
+                    totalMaxWidth = Math.max(totalMaxWidth, itemWidth);
                 }
             }
 
             if (testMode) {
                 for (InfoBox ib : test) {
                     renderInfoBox(g, ib, x, y, 1.0f);
+                    int itemWidth = iconSize;
+                    if (ib.getText() != null) {
+                        itemWidth = Math.max(itemWidth, g.getFontMetrics().stringWidth(ib.getText()));
+                    }
                     if (orientation == ComponentOrientation.HORIZONTAL) {
-                        x += iconSize + spacing;
+                        x += Math.max(iconSize, itemWidth) + spacing;
+                        totalMaxWidth = x;
+                        totalMaxHeight = Math.max(totalMaxHeight, iconSize + fontSize);
                     } else {
                         y += iconSize + spacing + fontSize;
+                        totalMaxHeight = y;
+                        totalMaxWidth = Math.max(totalMaxWidth, itemWidth);
                     }
                 }
             }
@@ -83,23 +101,28 @@ public class RuneBarsOverlay extends Overlay
                     continue;
                 }
                 renderInfoBox(g, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
+                int itemWidth = iconSize;
+                if (entry.getKey().getText() != null) {
+                    itemWidth = Math.max(itemWidth, g.getFontMetrics().stringWidth(entry.getKey().getText()));
+                }
                 if (orientation == ComponentOrientation.HORIZONTAL) {
-                    x += iconSize + spacing;
+                    x += Math.max(iconSize, itemWidth) + spacing;
+                    totalMaxWidth = x;
+                    totalMaxHeight = Math.max(totalMaxHeight, iconSize + fontSize);
                 } else {
                     y += iconSize + spacing + fontSize;
+                    totalMaxHeight = y;
+                    totalMaxWidth = Math.max(totalMaxWidth, itemWidth);
                 }
             }
 
-            int maxWidth, maxHeight;
             if (orientation == ComponentOrientation.HORIZONTAL) {
-                maxWidth = Math.max(0, x - spacing);
-                maxHeight = iconSize + fontSize;
+                totalMaxWidth = Math.max(0, totalMaxWidth - spacing);
             } else {
-                maxWidth = iconSize;
-                maxHeight = Math.max(0, y - spacing);
+                totalMaxHeight = Math.max(0, totalMaxHeight - spacing);
             }
 
-            return new Dimension(maxWidth, maxHeight);
+            return new Dimension(totalMaxWidth, totalMaxHeight);
         } finally {
             g.dispose();
         }
@@ -118,8 +141,8 @@ public class RuneBarsOverlay extends Overlay
         Graphics2D g = (Graphics2D) graphics.create();
         try {
             float finalOpacity = opacity;
-            if (ib instanceof Timer && opacity >= 1.0f) {
-                long rem = Duration.between(Instant.now(), ((Timer) ib).getEndTime()).toSeconds();
+            if (ib instanceof net.runelite.client.ui.overlay.infobox.Timer && opacity >= 1.0f) {
+                long rem = Duration.between(Instant.now(), ((net.runelite.client.ui.overlay.infobox.Timer) ib).getEndTime()).toSeconds();
                 if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) {
                     finalOpacity *= 0.5f;
                 }

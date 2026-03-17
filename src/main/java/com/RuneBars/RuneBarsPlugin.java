@@ -13,8 +13,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.inject.Provider;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -43,12 +41,12 @@ public class RuneBarsPlugin extends Plugin
 			Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject InfoBoxManager infoBoxManager;
-	@Inject OverlayManager overlayManager;
-	@Inject ConfigManager configManager;
-	@Inject RuneBarsConfig config;
-	@Inject Provider<RuneBarsOverlay> overlayProvider;
-	@Inject ClientToolbar clientToolbar;
+	public final InfoBoxManager infoBoxManager;
+	public final OverlayManager overlayManager;
+	public final ConfigManager configManager;
+	public final RuneBarsConfig config;
+	public final Provider<RuneBarsOverlay> overlayProvider;
+	public final ClientToolbar clientToolbar;
 
 	public RuneBarsOverlay overlay;
 
@@ -56,18 +54,24 @@ public class RuneBarsPlugin extends Plugin
 	private volatile Set<String> discoveredInfoBoxes = Collections.emptySet();
 	private volatile List<InfoBox> testInfoBoxes = Collections.emptyList();
 	private boolean testMode;
-	private RuneBarsPanel panel;
-	private NavigationButton navButton;
+	public RuneBarsPanel panel;
+	public NavigationButton navButton;
 
+	@Inject
+	public RuneBarsPlugin(InfoBoxManager infoBoxManager, OverlayManager overlayManager, ConfigManager configManager, RuneBarsConfig config, Provider<RuneBarsOverlay> overlayProvider, ClientToolbar clientToolbar) {
+		this.infoBoxManager = infoBoxManager;
+		this.overlayManager = overlayManager;
+		this.configManager = configManager;
+		this.config = config;
+		this.overlayProvider = overlayProvider;
+		this.clientToolbar = clientToolbar;
+	}
+
+	public RuneBarsConfig getConfig() { return config; }
 	public List<InfoBox> getCapturedInfoBoxes() { return capturedInfoBoxes; }
 	public Set<String> getDiscoveredInfoBoxes() { return discoveredInfoBoxes; }
 	public List<InfoBox> getTestInfoBoxes() { return testInfoBoxes; }
 	public boolean isTestMode() { return testMode; }
-
-	public RuneBarsConfig getConfig()
-	{
-		return config == null ? configManager.getConfig(RuneBarsConfig.class) : config;
-	}
 
 	@Override
 	protected void startUp() throws Exception {
@@ -123,7 +127,7 @@ public class RuneBarsPlugin extends Plugin
 		}
 	}
 
-	private boolean shouldCapture(InfoBox ib) {
+	public boolean shouldCapture(InfoBox ib) {
 		Boolean enabled = configManager.getConfiguration(RuneBarsConfig.GROUP, "enabled_" + ib.getName(), Boolean.class);
 		if (enabled != null) return enabled;
 		return config.combatOnlyByDefault() && (COMBAT_PATTERN.matcher(ib.getName()).find() ||
@@ -158,7 +162,7 @@ public class RuneBarsPlugin extends Plugin
 		testInfoBoxes = Collections.unmodifiableList(nextTest);
 	}
 
-	private void sortCapturedInfoBoxes(List<InfoBox> captured, List<InfoBox> test) {
+	public void sortCapturedInfoBoxes(List<InfoBox> captured, List<InfoBox> test) {
 		Comparator<InfoBox> comp = config.sortType() == RuneBarsConfig.SortType.ALPHABETICAL
 				? Comparator.comparing(InfoBox::getName)
 				: (b1, b2) -> (b1 instanceof Timer && b2 instanceof Timer) ? ((Timer) b1).getEndTime().compareTo(((Timer) b2).getEndTime()) : b1.getName().compareTo(b2.getName());
