@@ -17,6 +17,7 @@ public class RuneBarsOverlay extends Overlay
     private final RuneBarsPlugin plugin;
     private final RuneBarsConfig config;
     private final Map<InfoBox, Instant> fadingOut = new ConcurrentHashMap<>();
+    private final Map<BufferedImage, Color> colorCache = new WeakHashMap<>();
 
     @Inject
     private RuneBarsOverlay(RuneBarsPlugin plugin, RuneBarsConfig config) {
@@ -29,6 +30,9 @@ public class RuneBarsOverlay extends Overlay
     public Dimension render(Graphics2D graphics) {
         if (config == null) return null;
         if (plugin.getCapturedInfoBoxes().isEmpty() && (!plugin.isTestMode() || plugin.getTestInfoBoxes().isEmpty()) && fadingOut.isEmpty()) return null;
+
+        Font oldFont = graphics.getFont();
+        Composite oldComposite = graphics.getComposite();
         graphics.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
 
         int x = 0, y = 0, maxWidth = 0, maxHeight = 0;
@@ -63,6 +67,9 @@ public class RuneBarsOverlay extends Overlay
             if (elapsed >= config.fadeDelay()) { it.remove(); continue; }
             renderInfoBox(graphics, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
         }
+
+        graphics.setFont(oldFont);
+        graphics.setComposite(oldComposite);
         return new Dimension(maxWidth, maxHeight);
     }
 
@@ -86,13 +93,19 @@ public class RuneBarsOverlay extends Overlay
     }
 
     private Color getDominantColor(BufferedImage img) {
-        long r = 0, g = 0, b = 0, count = 0;
-        for (int i = 0; i < img.getWidth(); i++) {
-            for (int j = 0; j < img.getHeight(); j++) {
-                Color c = new Color(img.getRGB(i, j), true);
-                if (c.getAlpha() > 100) { r += c.getRed(); g += c.getGreen(); b += c.getBlue(); count++; }
+        return colorCache.computeIfAbsent(img, i -> {
+            long r = 0, g = 0, b = 0, count = 0;
+            int[] pixels = i.getRGB(0, 0, i.getWidth(), i.getHeight(), null, 0, i.getWidth());
+            for (int pixel : pixels) {
+                int alpha = (pixel >> 24) & 0xff;
+                if (alpha > 100) {
+                    r += (pixel >> 16) & 0xff;
+                    g += (pixel >> 8) & 0xff;
+                    b += (pixel) & 0xff;
+                    count++;
+                }
             }
-        }
-        return count == 0 ? Color.WHITE : new Color((int) (r / count), (int) (g / count), (int) (b / count));
+            return count == 0 ? Color.WHITE : new Color((int) (r / count), (int) (g / count), (int) (b / count));
+        });
     }
 }

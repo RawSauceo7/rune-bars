@@ -182,6 +182,7 @@ public class RuneBarsPanel extends PluginPanel
 
     public void update() {
         SwingUtilities.invokeLater(() -> {
+            boolean changed = false;
             for (String name : plugin.getDiscoveredInfoBoxes()) {
                 if (!toggles.containsKey(name)) {
                     JCheckBox cb = new JCheckBox(name);
@@ -191,8 +192,12 @@ public class RuneBarsPanel extends PluginPanel
                     cb.addActionListener(e -> configManager.setConfiguration(RuneBarsConfig.GROUP, "enabled_" + name, cb.isSelected()));
                     toggles.put(name, cb);
                     timerListPanel.add(cb);
-                    revalidate(); repaint();
+                    changed = true;
                 }
+            }
+            if (changed) {
+                revalidate();
+                repaint();
             }
         });
     }

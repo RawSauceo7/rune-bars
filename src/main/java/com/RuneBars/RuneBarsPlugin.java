@@ -79,6 +79,7 @@ public class RuneBarsPlugin extends Plugin
 		List<InfoBox> infoBoxes = infoBoxManager.getInfoBoxes();
 		List<InfoBox> toCapture = new ArrayList<>();
 
+		int prevDiscoveredSize = discoveredInfoBoxes.size();
 		for (InfoBox ib : infoBoxes) {
 			discoveredInfoBoxes.add(ib.getName());
 			if (shouldCapture(ib)) toCapture.add(ib);
@@ -96,7 +97,9 @@ public class RuneBarsPlugin extends Plugin
 		});
 
 		sortCapturedInfoBoxes();
-		if (panel != null) panel.update();
+		if (panel != null && discoveredInfoBoxes.size() != prevDiscoveredSize) {
+			panel.update();
+		}
 	}
 
 	private boolean shouldCapture(InfoBox ib) {
