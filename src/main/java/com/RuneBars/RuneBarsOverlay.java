@@ -4,6 +4,7 @@ import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
@@ -43,59 +44,72 @@ public class RuneBarsOverlay extends Overlay
 
         if (captured.isEmpty() && (!testMode || test.isEmpty()) && fadingOut.isEmpty()) return null;
 
-        graphics.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
+        Graphics2D g = (Graphics2D) graphics.create();
+        try {
+            g.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
 
-        int x = 0, y = 0, maxWidth = 0, maxHeight = 0;
-        ComponentOrientation orientation = config.orientation();
-        int iconSize = config.iconSize();
-        int spacing = config.spacing();
-        int fontSize = config.fontSize();
+            int x = 0, y = 0;
+            ComponentOrientation orientation = config.orientation();
+            int iconSize = config.iconSize();
+            int spacing = config.spacing();
+            int fontSize = config.fontSize();
 
-        for (InfoBox ib : captured) {
-            renderInfoBox(graphics, ib, x, y, 1.0f);
-            if (orientation == ComponentOrientation.HORIZONTAL) {
-                x += iconSize + spacing;
-            } else {
-                y += iconSize + spacing + fontSize;
-            }
-        }
-
-        if (testMode) {
-            for (InfoBox ib : test) {
-                renderInfoBox(graphics, ib, x, y, 1.0f);
+            for (InfoBox ib : captured) {
+                renderInfoBox(g, ib, x, y, 1.0f);
                 if (orientation == ComponentOrientation.HORIZONTAL) {
                     x += iconSize + spacing;
                 } else {
                     y += iconSize + spacing + fontSize;
                 }
             }
-        }
 
-        Iterator<Map.Entry<InfoBox, Instant>> it = fadingOut.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<InfoBox, Instant> entry = it.next();
-            long elapsed = Duration.between(entry.getValue(), Instant.now()).toMillis();
-            if (elapsed >= config.fadeDelay()) { it.remove(); continue; }
-            renderInfoBox(graphics, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
-            if (orientation == ComponentOrientation.HORIZONTAL) {
-                x += iconSize + spacing;
-            } else {
-                y += iconSize + spacing + fontSize;
+            if (testMode) {
+                for (InfoBox ib : test) {
+                    renderInfoBox(g, ib, x, y, 1.0f);
+                    if (orientation == ComponentOrientation.HORIZONTAL) {
+                        x += iconSize + spacing;
+                    } else {
+                        y += iconSize + spacing + fontSize;
+                    }
+                }
             }
-        }
 
-        if (orientation == ComponentOrientation.HORIZONTAL) {
-            maxWidth = Math.max(0, x - spacing);
-            maxHeight = iconSize + fontSize;
-        } else {
-            maxWidth = iconSize;
-            maxHeight = Math.max(0, y - spacing);
-        }
+            Iterator<Map.Entry<InfoBox, Instant>> it = fadingOut.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<InfoBox, Instant> entry = it.next();
+                long elapsed = Duration.between(entry.getValue(), Instant.now()).toMillis();
+                if (elapsed >= config.fadeDelay()) {
+                    it.remove();
+                    continue;
+                }
+                renderInfoBox(g, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
+                if (orientation == ComponentOrientation.HORIZONTAL) {
+                    x += iconSize + spacing;
+                } else {
+                    y += iconSize + spacing + fontSize;
+                }
+            }
 
-        return new Dimension(maxWidth, maxHeight);
+            int maxWidth, maxHeight;
+            if (orientation == ComponentOrientation.HORIZONTAL) {
+                maxWidth = Math.max(0, x - spacing);
+                maxHeight = iconSize + fontSize;
+            } else {
+                maxWidth = iconSize;
+                maxHeight = Math.max(0, y - spacing);
+            }
+
+            return new Dimension(maxWidth, maxHeight);
+        } finally {
+            g.dispose();
+        }
     }
 
-    public void onInfoBoxRemoved(InfoBox ib) { if (config.fadeDelay() > 0) fadingOut.put(ib, Instant.now()); }
+    public void onInfoBoxRemoved(InfoBox ib) {
+        if (config.fadeDelay() > 0) {
+            fadingOut.put(ib, Instant.now());
+        }
+    }
 
     private void renderInfoBox(Graphics2D graphics, InfoBox ib, int x, int y, float opacity) {
         BufferedImage img = ib.getImage();
@@ -106,7 +120,9 @@ public class RuneBarsOverlay extends Overlay
             float finalOpacity = opacity;
             if (ib instanceof Timer && opacity >= 1.0f) {
                 long rem = Duration.between(Instant.now(), ((Timer) ib).getEndTime()).toSeconds();
-                if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) finalOpacity *= 0.5f;
+                if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) {
+                    finalOpacity *= 0.5f;
+                }
             }
             g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, finalOpacity));
 
@@ -122,7 +138,10 @@ public class RuneBarsOverlay extends Overlay
             String text = ib.getText();
             if (text != null) {
                 g.setColor(ib.getTextColor());
-                g.drawString(text, x, y + config.iconSize() + config.fontSize());
+                // Center text horizontally under the icon
+                int textWidth = g.getFontMetrics().stringWidth(text);
+                int textX = x + (config.iconSize() - textWidth) / 2;
+                g.drawString(text, textX, y + config.iconSize() + config.fontSize());
             }
         } finally {
             g.dispose();

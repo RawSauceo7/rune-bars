@@ -1,11 +1,27 @@
 package com.RuneBars;
 
-import java.awt.*;
-import java.util.*;
-import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.GridLayout;
+import java.util.HashMap;
+import java.util.Map;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSlider;
+import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.ui.*;
+import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.overlay.components.ComponentOrientation;
 
 public class RuneBarsPanel extends PluginPanel
@@ -196,8 +212,8 @@ public class RuneBarsPanel extends PluginPanel
                 }
             }
             if (changed) {
-                revalidate();
-                repaint();
+                timerListPanel.revalidate();
+                timerListPanel.repaint();
             }
         });
     }

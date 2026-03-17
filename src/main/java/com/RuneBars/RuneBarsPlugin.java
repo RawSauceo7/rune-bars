@@ -28,42 +28,45 @@ import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.ui.overlay.infobox.Timer;
 import net.runelite.client.util.ImageUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Slf4j
 @PluginDescriptor(
 		name = "RuneBars"
 )
 public class RuneBarsPlugin extends Plugin
 {
+	private static final Logger log = LoggerFactory.getLogger(RuneBarsPlugin.class);
+
 	private static final Pattern COMBAT_PATTERN = Pattern.compile(
 			"(poison|venom|vengeance|antifire|stamina|prayer|overload|divine|boost|super|recharge)",
 			Pattern.CASE_INSENSITIVE
 	);
 
-	private final InfoBoxManager infoBoxManager;
-	private final OverlayManager overlayManager;
-	private final ConfigManager configManager;
-	private final RuneBarsConfig config;
-	private final Provider<RuneBarsOverlay> overlayProvider;
-	private final ClientToolbar clientToolbar;
+	@Inject InfoBoxManager infoBoxManager;
+	@Inject OverlayManager overlayManager;
+	@Inject ConfigManager configManager;
+	@Inject RuneBarsConfig config;
+	@Inject Provider<RuneBarsOverlay> overlayProvider;
+	@Inject ClientToolbar clientToolbar;
 
-	private RuneBarsOverlay overlay;
+	public RuneBarsOverlay overlay;
 
-	@Getter private volatile List<InfoBox> capturedInfoBoxes = Collections.emptyList();
-	@Getter private volatile Set<String> discoveredInfoBoxes = Collections.emptySet();
-	@Getter private volatile List<InfoBox> testInfoBoxes = Collections.emptyList();
-	@Getter private boolean testMode;
+	private volatile List<InfoBox> capturedInfoBoxes = Collections.emptyList();
+	private volatile Set<String> discoveredInfoBoxes = Collections.emptySet();
+	private volatile List<InfoBox> testInfoBoxes = Collections.emptyList();
+	private boolean testMode;
 	private RuneBarsPanel panel;
 	private NavigationButton navButton;
 
-	@Inject
-	public RuneBarsPlugin(InfoBoxManager infoBoxManager, OverlayManager overlayManager, ConfigManager configManager, RuneBarsConfig config, Provider<RuneBarsOverlay> overlayProvider, ClientToolbar clientToolbar) {
-		this.infoBoxManager = infoBoxManager;
-		this.overlayManager = overlayManager;
-		this.configManager = configManager;
-		this.config = config;
-		this.overlayProvider = overlayProvider;
-		this.clientToolbar = clientToolbar;
+	public List<InfoBox> getCapturedInfoBoxes() { return capturedInfoBoxes; }
+	public Set<String> getDiscoveredInfoBoxes() { return discoveredInfoBoxes; }
+	public List<InfoBox> getTestInfoBoxes() { return testInfoBoxes; }
+	public boolean isTestMode() { return testMode; }
+
+	public RuneBarsConfig getConfig()
+	{
+		return config == null ? configManager.getConfig(RuneBarsConfig.class) : config;
 	}
 
 	@Override
@@ -109,7 +112,7 @@ public class RuneBarsPlugin extends Plugin
 			return false;
 		});
 
-		sortCapturedInfoBoxes(nextCaptured, testMode ? new ArrayList<>(testInfoBoxes) : Collections.emptyList());
+		sortCapturedInfoBoxes(nextCaptured, testMode ? new ArrayList<>(testInfoBoxes) : new ArrayList<>());
 
 		int prevDiscoveredSize = discoveredInfoBoxes.size();
 		discoveredInfoBoxes = Collections.unmodifiableSet(nextDiscovered);
@@ -149,7 +152,9 @@ public class RuneBarsPlugin extends Plugin
 			nextTest.add(new TestTimer(1, ChronoUnit.MINUTES, icon, this));
 			nextTest.add(new TestInfoBox(icon, this));
 		}
-		sortCapturedInfoBoxes(capturedInfoBoxes, nextTest);
+		List<InfoBox> nextCaptured = new ArrayList<>(capturedInfoBoxes);
+		sortCapturedInfoBoxes(nextCaptured, nextTest);
+		capturedInfoBoxes = Collections.unmodifiableList(nextCaptured);
 		testInfoBoxes = Collections.unmodifiableList(nextTest);
 	}
 
