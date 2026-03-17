@@ -2,7 +2,6 @@ package com.RuneBars;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
-import java.awt.Composite;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
@@ -27,7 +26,7 @@ public class RuneBarsOverlay extends Overlay
     private final RuneBarsPlugin plugin;
     private final RuneBarsConfig config;
     private final Map<InfoBox, Instant> fadingOut = new ConcurrentHashMap<>();
-    private final Map<BufferedImage, Color> colorCache = new WeakHashMap<>();
+    private final Map<BufferedImage, Color[]> colorCache = new WeakHashMap<>();
 
     @Inject
     public RuneBarsOverlay(RuneBarsPlugin plugin, RuneBarsConfig config) {
@@ -38,35 +37,37 @@ public class RuneBarsOverlay extends Overlay
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        if (config == null) return null;
-        if (plugin.getCapturedInfoBoxes().isEmpty() && (!plugin.isTestMode() || plugin.getTestInfoBoxes().isEmpty()) && fadingOut.isEmpty()) return null;
+        List<InfoBox> captured = plugin.getCapturedInfoBoxes();
+        List<InfoBox> test = plugin.getTestInfoBoxes();
+        boolean testMode = plugin.isTestMode();
 
-        Font oldFont = graphics.getFont();
-        Composite oldComposite = graphics.getComposite();
+        if (captured.isEmpty() && (!testMode || test.isEmpty()) && fadingOut.isEmpty()) return null;
+
         graphics.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
 
         int x = 0, y = 0, maxWidth = 0, maxHeight = 0;
-        for (InfoBox ib : plugin.getCapturedInfoBoxes()) {
+        ComponentOrientation orientation = config.orientation();
+        int iconSize = config.iconSize();
+        int spacing = config.spacing();
+        int fontSize = config.fontSize();
+
+        for (InfoBox ib : captured) {
             renderInfoBox(graphics, ib, x, y, 1.0f);
-            if (config.orientation() == ComponentOrientation.HORIZONTAL) {
-                x += config.iconSize() + config.spacing();
+            if (orientation == ComponentOrientation.HORIZONTAL) {
+                x += iconSize + spacing;
             } else {
-                y += config.iconSize() + config.spacing() + config.fontSize();
+                y += iconSize + spacing + fontSize;
             }
-            maxWidth = Math.max(maxWidth, x + (config.orientation() == ComponentOrientation.HORIZONTAL ? 0 : config.iconSize()));
-            maxHeight = Math.max(maxHeight, y + (config.orientation() == ComponentOrientation.VERTICAL ? 0 : config.iconSize() + config.fontSize()));
         }
 
-        if (plugin.isTestMode()) {
-            for (InfoBox ib : plugin.getTestInfoBoxes()) {
+        if (testMode) {
+            for (InfoBox ib : test) {
                 renderInfoBox(graphics, ib, x, y, 1.0f);
-                if (config.orientation() == ComponentOrientation.HORIZONTAL) {
-                    x += config.iconSize() + config.spacing();
+                if (orientation == ComponentOrientation.HORIZONTAL) {
+                    x += iconSize + spacing;
                 } else {
-                    y += config.iconSize() + config.spacing() + config.fontSize();
+                    y += iconSize + spacing + fontSize;
                 }
-                maxWidth = Math.max(maxWidth, x + (config.orientation() == ComponentOrientation.HORIZONTAL ? 0 : config.iconSize()));
-                maxHeight = Math.max(maxHeight, y + (config.orientation() == ComponentOrientation.VERTICAL ? 0 : config.iconSize() + config.fontSize()));
             }
         }
 
@@ -76,17 +77,21 @@ public class RuneBarsOverlay extends Overlay
             long elapsed = Duration.between(entry.getValue(), Instant.now()).toMillis();
             if (elapsed >= config.fadeDelay()) { it.remove(); continue; }
             renderInfoBox(graphics, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
-            if (config.orientation() == ComponentOrientation.HORIZONTAL) {
-                x += config.iconSize() + config.spacing();
+            if (orientation == ComponentOrientation.HORIZONTAL) {
+                x += iconSize + spacing;
             } else {
-                y += config.iconSize() + config.spacing() + config.fontSize();
+                y += iconSize + spacing + fontSize;
             }
-            maxWidth = Math.max(maxWidth, x + (config.orientation() == ComponentOrientation.HORIZONTAL ? 0 : config.iconSize()));
-            maxHeight = Math.max(maxHeight, y + (config.orientation() == ComponentOrientation.VERTICAL ? 0 : config.iconSize() + config.fontSize()));
         }
 
-        graphics.setFont(oldFont);
-        graphics.setComposite(oldComposite);
+        if (orientation == ComponentOrientation.HORIZONTAL) {
+            maxWidth = Math.max(0, x - spacing);
+            maxHeight = iconSize + fontSize;
+        } else {
+            maxWidth = iconSize;
+            maxHeight = Math.max(0, y - spacing);
+        }
+
         return new Dimension(maxWidth, maxHeight);
     }
 
@@ -104,22 +109,32 @@ public class RuneBarsOverlay extends Overlay
                 if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) finalOpacity *= 0.5f;
             }
             g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, finalOpacity));
-            g.setColor(getDominantColor(img));
+
+            Color[] colors = getCachedColors(img);
+            Color bg = colors[1];
+            if (finalOpacity < 1.0f) {
+                bg = new Color(bg.getRed(), bg.getGreen(), bg.getBlue(), (int)(bg.getAlpha() * finalOpacity));
+            }
+            g.setColor(bg);
             g.fillRect(x, y, config.iconSize(), config.iconSize());
             g.drawImage(img, x, y, config.iconSize(), config.iconSize(), null);
-            if (ib.getText() != null) {
+
+            String text = ib.getText();
+            if (text != null) {
                 g.setColor(ib.getTextColor());
-                g.drawString(ib.getText(), x, y + config.iconSize());
+                g.drawString(text, x, y + config.iconSize() + config.fontSize());
             }
         } finally {
             g.dispose();
         }
     }
 
-    private Color getDominantColor(BufferedImage img) {
+    private Color[] getCachedColors(BufferedImage img) {
         return colorCache.computeIfAbsent(img, i -> {
             long r = 0, g = 0, b = 0, count = 0;
-            int[] pixels = i.getRGB(0, 0, i.getWidth(), i.getHeight(), null, 0, i.getWidth());
+            int w = i.getWidth();
+            int h = i.getHeight();
+            int[] pixels = i.getRGB(0, 0, w, h, null, 0, w);
             for (int pixel : pixels) {
                 int alpha = (pixel >> 24) & 0xff;
                 if (alpha > 100) {
@@ -129,7 +144,9 @@ public class RuneBarsOverlay extends Overlay
                     count++;
                 }
             }
-            return count == 0 ? new Color(255, 255, 255, 100) : new Color((int) (r / count), (int) (g / count), (int) (b / count), 100);
+            Color base = count == 0 ? Color.WHITE : new Color((int) (r / count), (int) (g / count), (int) (b / count));
+            Color translucent = new Color(base.getRed(), base.getGreen(), base.getBlue(), 100);
+            return new Color[] { base, translucent };
         });
     }
 }

@@ -40,25 +40,30 @@ public class RuneBarsPlugin extends Plugin
 			Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject InfoBoxManager infoBoxManager;
-	@Inject OverlayManager overlayManager;
-	@Inject ConfigManager configManager;
-	@Inject RuneBarsConfig config;
-	@Inject Provider<RuneBarsOverlay> overlayProvider;
-	@Inject ClientToolbar clientToolbar;
+	private final InfoBoxManager infoBoxManager;
+	private final OverlayManager overlayManager;
+	private final ConfigManager configManager;
+	private final RuneBarsConfig config;
+	private final Provider<RuneBarsOverlay> overlayProvider;
+	private final ClientToolbar clientToolbar;
 
 	private RuneBarsOverlay overlay;
 
-	@Getter private final List<InfoBox> capturedInfoBoxes = new ArrayList<>();
-	@Getter private final Set<String> discoveredInfoBoxes = new HashSet<>();
-	@Getter private final List<InfoBox> testInfoBoxes = new ArrayList<>();
+	@Getter private volatile List<InfoBox> capturedInfoBoxes = Collections.emptyList();
+	@Getter private volatile Set<String> discoveredInfoBoxes = Collections.emptySet();
+	@Getter private volatile List<InfoBox> testInfoBoxes = Collections.emptyList();
 	@Getter private boolean testMode;
 	private RuneBarsPanel panel;
 	private NavigationButton navButton;
 
-	public RuneBarsConfig getConfig()
-	{
-		return config == null ? configManager.getConfig(RuneBarsConfig.class) : config;
+	@Inject
+	public RuneBarsPlugin(InfoBoxManager infoBoxManager, OverlayManager overlayManager, ConfigManager configManager, RuneBarsConfig config, Provider<RuneBarsOverlay> overlayProvider, ClientToolbar clientToolbar) {
+		this.infoBoxManager = infoBoxManager;
+		this.overlayManager = overlayManager;
+		this.configManager = configManager;
+		this.config = config;
+		this.overlayProvider = overlayProvider;
+		this.clientToolbar = clientToolbar;
 	}
 
 	@Override
@@ -76,32 +81,40 @@ public class RuneBarsPlugin extends Plugin
 		overlayManager.remove(overlay);
 		clientToolbar.removeNavigation(navButton);
 		capturedInfoBoxes.forEach(infoBoxManager::addInfoBox);
-		capturedInfoBoxes.clear();
+		capturedInfoBoxes = Collections.emptyList();
+		discoveredInfoBoxes = Collections.emptySet();
+		testInfoBoxes = Collections.emptyList();
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick event) {
 		List<InfoBox> infoBoxes = infoBoxManager.getInfoBoxes();
+		List<InfoBox> nextCaptured = new ArrayList<>(capturedInfoBoxes);
+		Set<String> nextDiscovered = new HashSet<>(discoveredInfoBoxes);
 		List<InfoBox> toCapture = new ArrayList<>();
 
-		int prevDiscoveredSize = discoveredInfoBoxes.size();
 		for (InfoBox ib : infoBoxes) {
-			discoveredInfoBoxes.add(ib.getName());
+			nextDiscovered.add(ib.getName());
 			if (shouldCapture(ib)) toCapture.add(ib);
 		}
 
 		for (InfoBox ib : toCapture) {
 			infoBoxManager.removeInfoBox(ib);
-			capturedInfoBoxes.add(ib);
+			nextCaptured.add(ib);
 		}
 
-		capturedInfoBoxes.removeIf(ib -> {
+		nextCaptured.removeIf(ib -> {
 			if (ib.cull()) { overlay.onInfoBoxRemoved(ib); return true; }
 			if (!shouldCapture(ib)) { infoBoxManager.addInfoBox(ib); return true; }
 			return false;
 		});
 
-		sortCapturedInfoBoxes();
+		sortCapturedInfoBoxes(nextCaptured, testMode ? new ArrayList<>(testInfoBoxes) : Collections.emptyList());
+
+		int prevDiscoveredSize = discoveredInfoBoxes.size();
+		discoveredInfoBoxes = Collections.unmodifiableSet(nextDiscovered);
+		capturedInfoBoxes = Collections.unmodifiableList(nextCaptured);
+
 		if (panel != null && discoveredInfoBoxes.size() != prevDiscoveredSize) {
 			panel.update();
 		}
@@ -117,7 +130,11 @@ public class RuneBarsPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event) {
 		if (event.getGroup().equals(RuneBarsConfig.GROUP)) {
-			sortCapturedInfoBoxes();
+			List<InfoBox> nextCaptured = new ArrayList<>(capturedInfoBoxes);
+			List<InfoBox> nextTest = new ArrayList<>(testInfoBoxes);
+			sortCapturedInfoBoxes(nextCaptured, nextTest);
+			capturedInfoBoxes = Collections.unmodifiableList(nextCaptured);
+			testInfoBoxes = Collections.unmodifiableList(nextTest);
 			if (panel != null) {
 				panel.refreshSettings();
 			}
@@ -126,24 +143,23 @@ public class RuneBarsPlugin extends Plugin
 
 	public void toggleTestMode() {
 		testMode = !testMode;
+		List<InfoBox> nextTest = new ArrayList<>();
 		if (testMode) {
-			testInfoBoxes.clear();
 			BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
-			testInfoBoxes.add(new TestTimer(1, ChronoUnit.MINUTES, icon, this));
-			testInfoBoxes.add(new TestInfoBox(icon, this));
-		} else {
-			testInfoBoxes.clear();
+			nextTest.add(new TestTimer(1, ChronoUnit.MINUTES, icon, this));
+			nextTest.add(new TestInfoBox(icon, this));
 		}
-		sortCapturedInfoBoxes();
+		sortCapturedInfoBoxes(capturedInfoBoxes, nextTest);
+		testInfoBoxes = Collections.unmodifiableList(nextTest);
 	}
 
-	private void sortCapturedInfoBoxes() {
+	private void sortCapturedInfoBoxes(List<InfoBox> captured, List<InfoBox> test) {
 		Comparator<InfoBox> comp = config.sortType() == RuneBarsConfig.SortType.ALPHABETICAL
 				? Comparator.comparing(InfoBox::getName)
 				: (b1, b2) -> (b1 instanceof Timer && b2 instanceof Timer) ? ((Timer) b1).getEndTime().compareTo(((Timer) b2).getEndTime()) : b1.getName().compareTo(b2.getName());
 		if (config.sortOrder() == RuneBarsConfig.SortOrder.DESCENDING) comp = comp.reversed();
-		Collections.sort(capturedInfoBoxes, comp);
-		Collections.sort(testInfoBoxes, comp);
+		Collections.sort(captured, comp);
+		Collections.sort(test, comp);
 	}
 
 	@Provides
