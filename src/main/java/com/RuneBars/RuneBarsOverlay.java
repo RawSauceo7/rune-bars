@@ -30,7 +30,7 @@ public class RuneBarsOverlay extends Overlay
     private final Map<BufferedImage, Color> colorCache = new WeakHashMap<>();
 
     @Inject
-    private RuneBarsOverlay(RuneBarsPlugin plugin, RuneBarsConfig config) {
+    public RuneBarsOverlay(RuneBarsPlugin plugin, RuneBarsConfig config) {
         this.plugin = plugin;
         this.config = config;
         setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);

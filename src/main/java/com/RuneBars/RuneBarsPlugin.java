@@ -4,7 +4,12 @@ import com.google.inject.Provides;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -12,8 +17,8 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -35,12 +40,12 @@ public class RuneBarsPlugin extends Plugin
 			Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject private InfoBoxManager infoBoxManager;
-	@Inject private OverlayManager overlayManager;
-	@Inject private ConfigManager configManager;
-	@Inject private RuneBarsConfig config;
-	@Inject private Provider<RuneBarsOverlay> overlayProvider;
-	@Inject private ClientToolbar clientToolbar;
+	@Inject InfoBoxManager infoBoxManager;
+	@Inject OverlayManager overlayManager;
+	@Inject ConfigManager configManager;
+	@Inject RuneBarsConfig config;
+	@Inject Provider<RuneBarsOverlay> overlayProvider;
+	@Inject ClientToolbar clientToolbar;
 
 	private RuneBarsOverlay overlay;
 
@@ -124,14 +129,8 @@ public class RuneBarsPlugin extends Plugin
 		if (testMode) {
 			testInfoBoxes.clear();
 			BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
-			testInfoBoxes.add(new Timer(1, ChronoUnit.MINUTES, icon, this) {
-				@Override public String getName() { return "Test Timer"; }
-			});
-			testInfoBoxes.add(new InfoBox(icon, this) {
-				@Override public String getName() { return "Test Box"; }
-				@Override public String getText() { return "Test"; }
-				@Override public Color getTextColor() { return Color.WHITE; }
-			});
+			testInfoBoxes.add(new TestTimer(1, ChronoUnit.MINUTES, icon, this));
+			testInfoBoxes.add(new TestInfoBox(icon, this));
 		} else {
 			testInfoBoxes.clear();
 		}
@@ -148,8 +147,24 @@ public class RuneBarsPlugin extends Plugin
 	}
 
 	@Provides
-	static RuneBarsConfig provideConfig(ConfigManager cm)
+	public static RuneBarsConfig provideConfig(ConfigManager cm)
 	{
 		return cm.getConfig(RuneBarsConfig.class);
+	}
+
+	public static class TestTimer extends Timer {
+		public TestTimer(long duration, ChronoUnit unit, BufferedImage image, Plugin plugin) {
+			super(duration, unit, image, plugin);
+		}
+		@Override public String getName() { return "Test Timer"; }
+	}
+
+	public static class TestInfoBox extends InfoBox {
+		public TestInfoBox(BufferedImage image, Plugin plugin) {
+			super(image, plugin);
+		}
+		@Override public String getName() { return "Test Box"; }
+		@Override public String getText() { return "Test"; }
+		@Override public Color getTextColor() { return Color.WHITE; }
 	}
 }
