@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
+import javax.inject.Provider;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
@@ -37,9 +38,11 @@ public class RuneBarsPlugin extends Plugin
 	@Inject private InfoBoxManager infoBoxManager;
 	@Inject private OverlayManager overlayManager;
 	@Inject private ConfigManager configManager;
-	@Getter @Inject private RuneBarsConfig config;
-	@Inject private RuneBarsOverlay overlay;
+	@Inject private RuneBarsConfig config;
+	@Inject private Provider<RuneBarsOverlay> overlayProvider;
 	@Inject private ClientToolbar clientToolbar;
+
+	private RuneBarsOverlay overlay;
 
 	@Getter private final List<InfoBox> capturedInfoBoxes = new ArrayList<>();
 	@Getter private final Set<String> discoveredInfoBoxes = new HashSet<>();
@@ -48,8 +51,14 @@ public class RuneBarsPlugin extends Plugin
 	private RuneBarsPanel panel;
 	private NavigationButton navButton;
 
+	public RuneBarsConfig getConfig()
+	{
+		return config == null ? configManager.getConfig(RuneBarsConfig.class) : config;
+	}
+
 	@Override
 	protected void startUp() throws Exception {
+		overlay = overlayProvider.get();
 		overlayManager.add(overlay);
 		panel = new RuneBarsPanel(this, configManager);
 		navButton = NavigationButton.builder().tooltip("RuneBars").priority(7).panel(panel)
@@ -135,5 +144,9 @@ public class RuneBarsPlugin extends Plugin
 		Collections.sort(testInfoBoxes, comp);
 	}
 
-	@Provides RuneBarsConfig provideConfig(ConfigManager cm) { return cm.getConfig(RuneBarsConfig.class); }
+	@Provides
+	static RuneBarsConfig provideConfig(ConfigManager cm)
+	{
+		return cm.getConfig(RuneBarsConfig.class);
+	}
 }

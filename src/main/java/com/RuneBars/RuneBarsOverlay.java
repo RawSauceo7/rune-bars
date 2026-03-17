@@ -27,6 +27,7 @@ public class RuneBarsOverlay extends Overlay
 
     @Override
     public Dimension render(Graphics2D graphics) {
+        if (config == null) return null;
         if (plugin.getCapturedInfoBoxes().isEmpty() && (!plugin.isTestMode() || plugin.getTestInfoBoxes().isEmpty()) && fadingOut.isEmpty()) return null;
         graphics.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
 
