@@ -47,6 +47,7 @@ public class RuneBarsOverlay extends Overlay
         Graphics2D g = (Graphics2D) graphics.create();
         try {
             g.setFont(FontManager.getRunescapeFont().deriveFont((float) config.fontSize()));
+            FontMetrics fm = g.getFontMetrics();
 
             int x = 0, y = 0;
             ComponentOrientation orientation = config.orientation();
@@ -56,42 +57,39 @@ public class RuneBarsOverlay extends Overlay
             int totalMaxWidth = 0;
             int totalMaxHeight = 0;
 
+            // Render active info boxes
             for (InfoBox ib : captured) {
-                renderInfoBox(g, ib, x, y, 1.0f);
-                int itemWidth = iconSize;
-                if (ib.getText() != null) {
-                    itemWidth = Math.max(itemWidth, g.getFontMetrics().stringWidth(ib.getText()));
-                }
+                renderItem(g, ib, x, y, 1.0f, fm);
+                int slotWidth = Math.max(iconSize, ib.getText() != null ? fm.stringWidth(ib.getText()) : 0);
                 if (orientation == ComponentOrientation.HORIZONTAL) {
-                    x += Math.max(iconSize, itemWidth) + spacing;
+                    x += slotWidth + spacing;
                     totalMaxWidth = x;
                     totalMaxHeight = Math.max(totalMaxHeight, iconSize + fontSize);
                 } else {
                     y += iconSize + spacing + fontSize;
                     totalMaxHeight = y;
-                    totalMaxWidth = Math.max(totalMaxWidth, itemWidth);
+                    totalMaxWidth = Math.max(totalMaxWidth, slotWidth);
                 }
             }
 
+            // Render test info boxes
             if (testMode) {
                 for (InfoBox ib : test) {
-                    renderInfoBox(g, ib, x, y, 1.0f);
-                    int itemWidth = iconSize;
-                    if (ib.getText() != null) {
-                        itemWidth = Math.max(itemWidth, g.getFontMetrics().stringWidth(ib.getText()));
-                    }
+                    renderItem(g, ib, x, y, 1.0f, fm);
+                    int slotWidth = Math.max(iconSize, ib.getText() != null ? fm.stringWidth(ib.getText()) : 0);
                     if (orientation == ComponentOrientation.HORIZONTAL) {
-                        x += Math.max(iconSize, itemWidth) + spacing;
+                        x += slotWidth + spacing;
                         totalMaxWidth = x;
                         totalMaxHeight = Math.max(totalMaxHeight, iconSize + fontSize);
                     } else {
                         y += iconSize + spacing + fontSize;
                         totalMaxHeight = y;
-                        totalMaxWidth = Math.max(totalMaxWidth, itemWidth);
+                        totalMaxWidth = Math.max(totalMaxWidth, slotWidth);
                     }
                 }
             }
 
+            // Render fading info boxes
             Iterator<Map.Entry<InfoBox, Instant>> it = fadingOut.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<InfoBox, Instant> entry = it.next();
@@ -100,22 +98,21 @@ public class RuneBarsOverlay extends Overlay
                     it.remove();
                     continue;
                 }
-                renderInfoBox(g, entry.getKey(), x, y, 1.0f - ((float) elapsed / config.fadeDelay()));
-                int itemWidth = iconSize;
-                if (entry.getKey().getText() != null) {
-                    itemWidth = Math.max(itemWidth, g.getFontMetrics().stringWidth(entry.getKey().getText()));
-                }
+                float opacity = 1.0f - ((float) elapsed / config.fadeDelay());
+                renderItem(g, entry.getKey(), x, y, opacity, fm);
+                int slotWidth = Math.max(iconSize, entry.getKey().getText() != null ? fm.stringWidth(entry.getKey().getText()) : 0);
                 if (orientation == ComponentOrientation.HORIZONTAL) {
-                    x += Math.max(iconSize, itemWidth) + spacing;
+                    x += slotWidth + spacing;
                     totalMaxWidth = x;
                     totalMaxHeight = Math.max(totalMaxHeight, iconSize + fontSize);
                 } else {
                     y += iconSize + spacing + fontSize;
                     totalMaxHeight = y;
-                    totalMaxWidth = Math.max(totalMaxWidth, itemWidth);
+                    totalMaxWidth = Math.max(totalMaxWidth, slotWidth);
                 }
             }
 
+            // Adjust dimensions to remove trailing spacing
             if (orientation == ComponentOrientation.HORIZONTAL) {
                 totalMaxWidth = Math.max(0, totalMaxWidth - spacing);
             } else {
@@ -134,40 +131,41 @@ public class RuneBarsOverlay extends Overlay
         }
     }
 
-    private void renderInfoBox(Graphics2D graphics, InfoBox ib, int x, int y, float opacity) {
+    private void renderItem(Graphics2D g, InfoBox ib, int x, int y, float opacity, FontMetrics fm) {
         BufferedImage img = ib.getImage();
         if (img == null) return;
 
-        Graphics2D g = (Graphics2D) graphics.create();
-        try {
-            float finalOpacity = opacity;
-            if (ib instanceof net.runelite.client.ui.overlay.infobox.Timer && opacity >= 1.0f) {
-                long rem = Duration.between(Instant.now(), ((net.runelite.client.ui.overlay.infobox.Timer) ib).getEndTime()).toSeconds();
-                if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) {
-                    finalOpacity *= 0.5f;
-                }
-            }
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, finalOpacity));
+        int iconSize = config.iconSize();
+        String text = ib.getText();
+        int textWidth = text != null ? fm.stringWidth(text) : 0;
+        int slotWidth = Math.max(iconSize, textWidth);
 
-            Color[] colors = getCachedColors(img);
-            Color bg = colors[1];
-            if (finalOpacity < 1.0f) {
-                bg = new Color(bg.getRed(), bg.getGreen(), bg.getBlue(), (int)(bg.getAlpha() * finalOpacity));
-            }
-            g.setColor(bg);
-            g.fillRect(x, y, config.iconSize(), config.iconSize());
-            g.drawImage(img, x, y, config.iconSize(), config.iconSize(), null);
+        // Center icon and text within the slot
+        int iconX = x + (slotWidth - iconSize) / 2;
+        int textX = x + (slotWidth - textWidth) / 2;
 
-            String text = ib.getText();
-            if (text != null) {
-                g.setColor(ib.getTextColor());
-                // Center text horizontally under the icon
-                int textWidth = g.getFontMetrics().stringWidth(text);
-                int textX = x + (config.iconSize() - textWidth) / 2;
-                g.drawString(text, textX, y + config.iconSize() + config.fontSize());
+        float finalOpacity = opacity;
+        if (ib instanceof Timer && opacity >= 1.0f) {
+            long rem = Duration.between(Instant.now(), ((Timer) ib).getEndTime()).toSeconds();
+            if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) {
+                finalOpacity *= 0.5f;
             }
-        } finally {
-            g.dispose();
+        }
+
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, finalOpacity));
+
+        Color[] colors = getCachedColors(img);
+        Color bg = colors[1];
+        if (finalOpacity < 1.0f) {
+            bg = new Color(bg.getRed(), bg.getGreen(), bg.getBlue(), (int)(bg.getAlpha() * finalOpacity));
+        }
+        g.setColor(bg);
+        g.fillRect(iconX, y, iconSize, iconSize);
+        g.drawImage(img, iconX, y, iconSize, iconSize, null);
+
+        if (text != null) {
+            g.setColor(ib.getTextColor());
+            g.drawString(text, textX, y + iconSize + config.fontSize());
         }
     }
 

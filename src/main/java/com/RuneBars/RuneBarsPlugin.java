@@ -41,12 +41,12 @@ public class RuneBarsPlugin extends Plugin
 			Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject public InfoBoxManager infoBoxManager;
-	@Inject public OverlayManager overlayManager;
-	@Inject public ConfigManager configManager;
-	@Inject public RuneBarsConfig config;
-	@Inject public Provider<RuneBarsOverlay> overlayProvider;
-	@Inject public ClientToolbar clientToolbar;
+	@Inject InfoBoxManager infoBoxManager;
+	@Inject OverlayManager overlayManager;
+	@Inject ConfigManager configManager;
+	@Inject RuneBarsConfig config;
+	@Inject Provider<RuneBarsOverlay> overlayProvider;
+	@Inject ClientToolbar clientToolbar;
 
 	public RuneBarsOverlay overlay;
 
