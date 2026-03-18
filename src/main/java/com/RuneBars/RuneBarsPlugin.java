@@ -41,12 +41,12 @@ public class RuneBarsPlugin extends Plugin
 			Pattern.CASE_INSENSITIVE
 	);
 
-	public final InfoBoxManager infoBoxManager;
-	public final OverlayManager overlayManager;
-	public final ConfigManager configManager;
-	public final RuneBarsConfig config;
-	public final Provider<RuneBarsOverlay> overlayProvider;
-	public final ClientToolbar clientToolbar;
+	@Inject public InfoBoxManager infoBoxManager;
+	@Inject public OverlayManager overlayManager;
+	@Inject public ConfigManager configManager;
+	@Inject public RuneBarsConfig config;
+	@Inject public Provider<RuneBarsOverlay> overlayProvider;
+	@Inject public ClientToolbar clientToolbar;
 
 	public RuneBarsOverlay overlay;
 
@@ -56,16 +56,6 @@ public class RuneBarsPlugin extends Plugin
 	private boolean testMode;
 	public RuneBarsPanel panel;
 	public NavigationButton navButton;
-
-	@Inject
-	public RuneBarsPlugin(InfoBoxManager infoBoxManager, OverlayManager overlayManager, ConfigManager configManager, RuneBarsConfig config, Provider<RuneBarsOverlay> overlayProvider, ClientToolbar clientToolbar) {
-		this.infoBoxManager = infoBoxManager;
-		this.overlayManager = overlayManager;
-		this.configManager = configManager;
-		this.config = config;
-		this.overlayProvider = overlayProvider;
-		this.clientToolbar = clientToolbar;
-	}
 
 	public RuneBarsConfig getConfig() { return config; }
 	public List<InfoBox> getCapturedInfoBoxes() { return capturedInfoBoxes; }
