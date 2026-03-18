@@ -7,8 +7,6 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +24,7 @@ public class RuneBarsOverlay extends Overlay
 {
     private final RuneBarsPlugin plugin;
     private final RuneBarsConfig config;
-    private final Map<InfoBox, Instant> fadingOut = new ConcurrentHashMap<>();
+    private final Map<InfoBox, Long> fadingOut = new ConcurrentHashMap<>();
     private final Map<BufferedImage, Color[]> colorCache = new WeakHashMap<>();
 
     @Inject
@@ -57,9 +55,12 @@ public class RuneBarsOverlay extends Overlay
             int totalMaxWidth = 0;
             int totalMaxHeight = 0;
 
+            long now = System.currentTimeMillis();
+
             // Render active info boxes
             for (InfoBox ib : captured) {
-                renderItem(g, ib, x, y, 1.0f, fm);
+                if (fadingOut.containsKey(ib)) continue;
+                renderItem(g, ib, x, y, 1.0f, fm, now);
                 int slotWidth = Math.max(iconSize, ib.getText() != null ? fm.stringWidth(ib.getText()) : 0);
                 if (orientation == ComponentOrientation.HORIZONTAL) {
                     x += slotWidth + spacing;
@@ -75,7 +76,8 @@ public class RuneBarsOverlay extends Overlay
             // Render test info boxes
             if (testMode) {
                 for (InfoBox ib : test) {
-                    renderItem(g, ib, x, y, 1.0f, fm);
+                    if (fadingOut.containsKey(ib)) continue;
+                    renderItem(g, ib, x, y, 1.0f, fm, now);
                     int slotWidth = Math.max(iconSize, ib.getText() != null ? fm.stringWidth(ib.getText()) : 0);
                     if (orientation == ComponentOrientation.HORIZONTAL) {
                         x += slotWidth + spacing;
@@ -90,16 +92,16 @@ public class RuneBarsOverlay extends Overlay
             }
 
             // Render fading info boxes
-            Iterator<Map.Entry<InfoBox, Instant>> it = fadingOut.entrySet().iterator();
+            Iterator<Map.Entry<InfoBox, Long>> it = fadingOut.entrySet().iterator();
             while (it.hasNext()) {
-                Map.Entry<InfoBox, Instant> entry = it.next();
-                long elapsed = Duration.between(entry.getValue(), Instant.now()).toMillis();
+                Map.Entry<InfoBox, Long> entry = it.next();
+                long elapsed = now - entry.getValue();
                 if (elapsed >= config.fadeDelay()) {
                     it.remove();
                     continue;
                 }
                 float opacity = 1.0f - ((float) elapsed / config.fadeDelay());
-                renderItem(g, entry.getKey(), x, y, opacity, fm);
+                renderItem(g, entry.getKey(), x, y, opacity, fm, now);
                 int slotWidth = Math.max(iconSize, entry.getKey().getText() != null ? fm.stringWidth(entry.getKey().getText()) : 0);
                 if (orientation == ComponentOrientation.HORIZONTAL) {
                     x += slotWidth + spacing;
@@ -112,11 +114,13 @@ public class RuneBarsOverlay extends Overlay
                 }
             }
 
-            // Adjust dimensions to remove trailing spacing
+            // Adjust dimensions to remove trailing spacing and account for text descenders
             if (orientation == ComponentOrientation.HORIZONTAL) {
                 totalMaxWidth = Math.max(0, totalMaxWidth - spacing);
+                totalMaxHeight += 2; // Padding for descenders
             } else {
                 totalMaxHeight = Math.max(0, totalMaxHeight - spacing);
+                totalMaxHeight += 2; // Padding for last item's text descenders
             }
 
             return new Dimension(totalMaxWidth, totalMaxHeight);
@@ -127,11 +131,11 @@ public class RuneBarsOverlay extends Overlay
 
     public void onInfoBoxRemoved(InfoBox ib) {
         if (config.fadeDelay() > 0) {
-            fadingOut.put(ib, Instant.now());
+            fadingOut.put(ib, System.currentTimeMillis());
         }
     }
 
-    private void renderItem(Graphics2D g, InfoBox ib, int x, int y, float opacity, FontMetrics fm) {
+    private void renderItem(Graphics2D g, InfoBox ib, int x, int y, float opacity, FontMetrics fm, long now) {
         BufferedImage img = ib.getImage();
         if (img == null) return;
 
@@ -146,8 +150,8 @@ public class RuneBarsOverlay extends Overlay
 
         float finalOpacity = opacity;
         if (ib instanceof Timer && opacity >= 1.0f) {
-            long rem = Duration.between(Instant.now(), ((Timer) ib).getEndTime()).toSeconds();
-            if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (System.currentTimeMillis() / 500) % 2 == 0) {
+            long rem = ((((Timer) ib).getEndTime().toEpochMilli()) - now) / 1000;
+            if (config.flashThreshold() > 0 && rem <= config.flashThreshold() && (now / 500) % 2 == 0) {
                 finalOpacity *= 0.5f;
             }
         }

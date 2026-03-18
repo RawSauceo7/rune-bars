@@ -68,8 +68,17 @@ public class RuneBarsPlugin extends Plugin
 		overlay = overlayProvider.get();
 		overlayManager.add(overlay);
 		panel = new RuneBarsPanel(this, configManager);
-		navButton = NavigationButton.builder().tooltip("RuneBars").priority(7).panel(panel)
-				.icon(ImageUtil.loadImageResource(getClass(), "/icon.png")).build();
+
+		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
+		icon = ImageUtil.resizeImage(icon, 24, 24);
+
+		navButton = NavigationButton.builder()
+				.tooltip("RuneBars")
+				.priority(7)
+				.panel(panel)
+				.icon(icon)
+				.build();
+
 		clientToolbar.addNavigation(navButton);
 	}
 
