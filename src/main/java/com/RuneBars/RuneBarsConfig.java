@@ -42,4 +42,7 @@ public interface RuneBarsConfig extends Config
 
 	@ConfigItem(keyName = "ignoredInfoBoxes", name = "Ignored Bars", description = "Comma-separated list of bar names to ignore (e.g., Stamina, Super Combat)", position = 10)
 	default String ignoredInfoBoxes() { return ""; }
+
+	@ConfigItem(keyName = "testMode", name = "Test Mode", description = "Display test bars for UI configuration", position = 11)
+	default boolean testMode() { return false; }
 }

@@ -48,17 +48,16 @@ public class RuneBarsPlugin extends Plugin
 
 	private volatile List<InfoBox> capturedInfoBoxes = Collections.emptyList();
 	private volatile List<InfoBox> testInfoBoxes = Collections.emptyList();
-	private boolean testMode;
 
 	public RuneBarsConfig getConfig() { return config; }
 	public List<InfoBox> getCapturedInfoBoxes() { return capturedInfoBoxes; }
 	public List<InfoBox> getTestInfoBoxes() { return testInfoBoxes; }
-	public boolean isTestMode() { return testMode; }
 
 	@Override
 	protected void startUp() throws Exception {
 		overlay = overlayProvider.get();
 		overlayManager.add(overlay);
+		updateTestMode();
 	}
 
 	@Override
@@ -90,7 +89,7 @@ public class RuneBarsPlugin extends Plugin
 			return false;
 		});
 
-		sortCapturedInfoBoxes(nextCaptured, testMode ? new ArrayList<>(testInfoBoxes) : new ArrayList<>());
+		sortCapturedInfoBoxes(nextCaptured, new ArrayList<>(testInfoBoxes));
 		capturedInfoBoxes = Collections.unmodifiableList(nextCaptured);
 	}
 
@@ -106,18 +105,21 @@ public class RuneBarsPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event) {
 		if (event.getGroup().equals(RuneBarsConfig.GROUP)) {
-			List<InfoBox> nextCaptured = new ArrayList<>(capturedInfoBoxes);
-			List<InfoBox> nextTest = new ArrayList<>(testInfoBoxes);
-			sortCapturedInfoBoxes(nextCaptured, nextTest);
-			capturedInfoBoxes = Collections.unmodifiableList(nextCaptured);
-			testInfoBoxes = Collections.unmodifiableList(nextTest);
+			if (event.getKey().equals("testMode")) {
+				updateTestMode();
+			} else {
+				List<InfoBox> nextCaptured = new ArrayList<>(capturedInfoBoxes);
+				List<InfoBox> nextTest = new ArrayList<>(testInfoBoxes);
+				sortCapturedInfoBoxes(nextCaptured, nextTest);
+				capturedInfoBoxes = Collections.unmodifiableList(nextCaptured);
+				testInfoBoxes = Collections.unmodifiableList(nextTest);
+			}
 		}
 	}
 
-	public void toggleTestMode() {
-		testMode = !testMode;
+	private void updateTestMode() {
 		List<InfoBox> nextTest = new ArrayList<>();
-		if (testMode) {
+		if (config.testMode()) {
 			BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
 			nextTest.add(new TestTimer(1, ChronoUnit.MINUTES, icon, this));
 			nextTest.add(new TestInfoBox(icon, this));

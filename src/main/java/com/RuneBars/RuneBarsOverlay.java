@@ -38,7 +38,7 @@ public class RuneBarsOverlay extends Overlay
     public Dimension render(Graphics2D graphics) {
         List<InfoBox> captured = plugin.getCapturedInfoBoxes();
         List<InfoBox> test = plugin.getTestInfoBoxes();
-        boolean testMode = plugin.isTestMode();
+        boolean testMode = config.testMode();
 
         if (captured.isEmpty() && (!testMode || test.isEmpty()) && fadingOut.isEmpty()) return null;
 
