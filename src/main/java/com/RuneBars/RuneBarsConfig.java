@@ -39,4 +39,7 @@ public interface RuneBarsConfig extends Config
 
 	@ConfigItem(keyName = "fontSize", name = "Font Size", description = "The font size of the timer text", position = 9)
 	default int fontSize() { return 12; }
+
+	@ConfigItem(keyName = "ignoredInfoBoxes", name = "Ignored Bars", description = "Comma-separated list of bar names to ignore (e.g., Stamina, Super Combat)", position = 10)
+	default String ignoredInfoBoxes() { return ""; }
 }
